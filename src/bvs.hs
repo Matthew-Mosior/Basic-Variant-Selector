@@ -37,7 +37,6 @@ data Flag
     = Verbose               -- -v
     | Version               -- -V -?
     | InFormat String       -- -I
-    | OutFormat String      -- -O
     | MgibedFile FilePath   -- -m
     | OutputFile String     -- -o 
     | GzipIn                -- -g
@@ -56,7 +55,6 @@ options =
     [ Option ['v']     ["verbose"]             (NoArg Verbose)                "Output on stderr.",
       Option ['V','?'] ["version"]             (NoArg Version)                "Show version number.",
       Option ['I']     ["InFormat"]            (ReqArg InFormat "IN")         "The format of the input file.",
-      Option ['O']     ["OutFormat"]           (ReqArg OutFormat "OUT")       "The format of the output file.",
       Option ['m']     ["MgibedFile"]          (ReqArg MgibedFile "MGIBED")   "The mgibed file from which to select variants.",
       Option ['o']     ["OutputFile"]          (ReqArg OutputFile "OUTFILE")  "The output file.", 
       Option ['g']     ["GzipIn"]              (NoArg GzipIn)                 "Gzipped input file?",
@@ -86,12 +84,6 @@ isInFormat :: Flag -> Bool
 isInFormat (InFormat _) = True
 isInFormat _            = False
 
---IsOutFormat -> This function will
---test for OutFormat flag.
-isOutFormat :: Flag -> Bool
-isOutFormat (OutFormat _) = True
-isOutFormat _             = False
-
 --isGzipOut -> This function will
 --test for the GzipOut flag.
 isGzipOut :: Flag -> Bool
@@ -120,12 +112,6 @@ extractMgibedFile (MgibedFile x) = x
 extractInFormat :: Flag -> String
 extractInFormat (InFormat x) = x
 
---extractOutFormat -> This function will
---extract the string associated with
---OutFormat.
-extractOutFormat :: Flag -> String
-extractOutFormat (OutFormat x) = x
-
 {------------------------------------------------}
 
 {-compilerOpts-related functions-}
@@ -137,25 +123,6 @@ checkInFormat [] = False
 checkInFormat xs = if xs == "vcf" || xs == "tvcf"
                        then True
                        else False
-
---checkOutFormat -> This function will
---check the format of OUT string.
-checkOutFormat :: String -> Bool
-checkOutFormat [] = False
-checkOutFormat xs = if xs == "mgibed"
-                        then True
-                        else False
-
---checkInOutFormats -> This function will
---check the formats of the IN and OUT string.
-checkInOutFormats :: String -> String -> Bool
-checkInOutFormats [] [] = False
-checkInOutFormats [] _  = False
-checkInOutFormats _  [] = False
-checkInOutFormats xs ys = if (xs == "vcf" && ys == "mgibed")
-                          || (xs == "tvcf" && ys == "mgibed")
-                              then True 
-                              else False
 
 {--------------------}
 
@@ -180,34 +147,17 @@ compilerOpts argv =
                                 (not (checkInFormat (extractInFormat (DL.head (DL.filter (isInFormat) args)))))
                             then do hPutStrLn stderr (inferror ++ formats ++ SCG.usageInfo header options)
                                     SX.exitWith (SX.ExitFailure 1)
-                            else if (DL.length (DL.filter (isOutFormat) args) < 1)
-                                then do hPutStrLn stderr (outerror ++ formats ++ SCG.usageInfo header options)
-                                        SX.exitWith (SX.ExitFailure 1)
-                                else if (DL.length (DL.filter (isOutFormat) args) > 0) &&
-                                        (not (checkOutFormat (extractOutFormat (DL.head (DL.filter (isOutFormat) args)))))
-                                    then do hPutStrLn stderr (outferror ++ formats ++ SCG.usageInfo header options)
-                                            SX.exitWith (SX.ExitFailure 1)
-                                    else if (DL.length (DL.filter (isInFormat) args) < 1) &&
-                                            (DL.length (DL.filter (isOutFormat) args) < 1)
-                                        then do hPutStrLn stderr (inerror ++ outerror ++ SCG.usageInfo header options) 
+                            else if (DL.length (DL.filter (isGzipOut) args) > 0) &&
+                                    (DL.length (DL.filter (isOutputFile) args) < 1) 
+                                then do hPutStrLn stderr (gziperror ++ SCG.usageInfo header options)
+                                        SX.exitWith (ExitFailure 1)
+                                else if (DL.length (DL.filter (isMgibedFile) args) < 1)
+                                    then do hPutStrLn stderr (mgibedferror ++ SCG.usageInfo header options)
+                                            SX.exitWith (ExitFailure 1)
+                                    else if DL.length file > 1
+                                        then do hPutStrLn stderr (flerror ++ greeting ++ github ++ SCG.usageInfo header options)
                                                 SX.exitWith (SX.ExitFailure 1)
-                                        else if (DL.length (DL.filter (isInFormat) args) > 0) &&
-                                                (DL.length (DL.filter (isOutFormat) args) > 0) &&
-                                                (not (checkInOutFormats (extractInFormat (DL.head (DL.filter (isInFormat) args))) 
-                                                                        (extractOutFormat (DL.head (DL.filter (isOutFormat) args)))))
-                                            then do hPutStrLn stderr (inoutmismatch ++ inoutmappings ++ SCG.usageInfo header options)
-                                                    SX.exitWith (SX.ExitFailure 1)
-                                            else if (DL.length (DL.filter (isGzipOut) args) > 0) &&
-                                                    (DL.length (DL.filter (isOutputFile) args) < 1) 
-                                                then do hPutStrLn stderr (gziperror ++ SCG.usageInfo header options)
-                                                        SX.exitWith (ExitFailure 1)
-                                                else if (DL.length (DL.filter (isMgibedFile) args) < 1)
-                                                    then do hPutStrLn stderr (mgibedferror ++ SCG.usageInfo header options)
-                                                            SX.exitWith (ExitFailure 1)
-                                                    else if DL.length file > 1
-                                                        then do hPutStrLn stderr (flerror ++ greeting ++ github ++ SCG.usageInfo header options)
-                                                                SX.exitWith (SX.ExitFailure 1)
-                                                        else return (DL.nub args,DL.concat file)
+                                            else return (DL.nub args,DL.concat file)
         (_,_,errors) -> do
             hPutStrLn stderr (DL.concat errors ++ SCG.usageInfo header options)
             SX.exitWith (SX.ExitFailure 1)
@@ -218,31 +168,26 @@ compilerOpts argv =
             github         = "Please see https://github.com/Matthew-Mosior/Variant-to-bam-readcount.\n"
             flerror        = "Incorrect number of input files:  Please provide a single input file.\n" 
             inerror        = "Please provide an input format (-I).\n"
-            outerror       = "Please provide an output format (-O).\n"
             inferror       = "Input format not recognized.\n" 
-            outferror      = "Output format not recognized.\n"
             mgibedferror   = "Please provide a single mgibed file from which to select variants (-m)."
             gziperror      = "OutputFile argument (-o) necessary to use GzipOut argument (-G).\n"
             formats        = "Accepted input formats are vcf and tvcf.\nThe accepted output format is mgibed.\n"
-            inoutmismatch  = "Please provide an appropriate input/output mapping.\n"
-            inoutmappings  = "Appropriate mappings are: vcf -> mgibed and tvcf -> mgibed.\n"
-
+           
 {----------------------------------------}
 
-{-Vep or vcf pipeline function.-}
+{-Vcf or Tvcf pipeline function.-}
 
---mgiBedPipeline -> This function will
+--pipeLine -> This function will
 --help decide which pipeline the script
 --will follow.
-mgiBedPipeline :: [Flag] -> (String,String)
-mgiBedPipeline []      = ([],[])
-mgiBedPipeline options = if instring == "vcf" && outstring == "mgibed"
-                             then ("vcf","mgibed")
-                             else ("tvcf","mgibed")
+pipeLine :: [Flag] -> String
+pipeLine []      = []
+pipeLine options = if instring == "vcf"
+                             then "vcf"
+                             else "tvcf"
     where
         --Local definitions.--
         instring  = extractInFormat (DL.head (DL.filter (isInFormat) options))
-        outstring = extractOutFormat (DL.head (DL.filter (isOutFormat) options))   
         ----------------------  
 
 {-------------------------------}
@@ -806,14 +751,14 @@ main = do
         then do --Get stdin.
                 contents <- SIO.getContents
                 --mgibed parsing pipeline?
-                if (fst (mgiBedPipeline args) == "vcf" && snd (mgiBedPipeline args) == "mgibed")
+                if (pipeLine args) == "vcf"
                     then do --Run args and contents through processArgsAndContentsVcfTvcf.
                             processArgsAndContentsVcfMgibed (args,contents)
                     else do --Run args and contents through processArgsAndContentsTvcfVcf.
                             processArgsAndContentsTvcfMgibed (args,contents) 
 
         else do --mgibed parsing pipeline?
-                if (fst (mgiBedPipeline args) == "vcf" && snd (mgiBedPipeline args) == "mgibed")
+                if (pipeLine args) == "vcf" 
                     then do --Run args and contents through processArgsAndFilesVcfTvcf.
                             processArgsAndFilesVcfMgibed (args,files)
                     else do --Run args and contents through processArgsAndFilesTvcfVcf.
