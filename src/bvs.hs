@@ -1,4 +1,4 @@
-{-=VariantSelector (VS): A Haskell-based solution for=-}
+{-=BasicVariantSelector (BVS): A Haskell-based solution for=-}
 {-=selecting variants from a variant calling format=-}
 {-=(vcf) file from a mgibed file.=-}
 {-=Author: Matthew Mosior=-}
@@ -212,9 +212,9 @@ compilerOpts argv =
             hPutStrLn stderr (DL.concat errors ++ SCG.usageInfo header options)
             SX.exitWith (SX.ExitFailure 1)
         where
-            greeting       = "Variant Selector, Copyright (c) 2019 Matthew Mosior.\n"
+            greeting       = "Basic Variant Selector, Copyright (c) 2019 Matthew Mosior.\n"
             header         = "Usage: vs [-vV?IOmogG] [file]"
-            version        = "Variant Selector (VS), Version 1.0.\n"
+            version        = "Basic Variant Selector (VS), Version 1.0.\n"
             github         = "Please see https://github.com/Matthew-Mosior/Variant-to-bam-readcount.\n"
             flerror        = "Incorrect number of input files:  Please provide a single input file.\n" 
             inerror        = "Please provide an input format (-I).\n"
@@ -399,7 +399,7 @@ gzipPrintFile opts xs = do
 
 {---------------------}
 
-{-VS Specific Functions.-}
+{-BVS Specific Functions.-}
  
 --processArgsAndFilesVcfMgibed -> This function will
 --walk through each of the command-line
